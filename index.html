@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="theme-color" content="#121417"/>
+<title>베이스 지판 트레이너</title>
+<style>
+:root{
+  --bg:#121417; --panel:#1b2027; --panel2:#232a33; --line:#2e3743;
+  --text:#e7ecf2; --muted:#8a94a2; --accent:#4da3ff;
+  --ok:#3ddc84; --ng:#ff5252;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0; padding:0; background:var(--bg); color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI",sans-serif;
+  touch-action:manipulation; -webkit-user-select:none; user-select:none}
+[hidden]{display:none!important}
+.app{max-width:1100px; margin:0 auto; padding:10px 12px calc(14px + env(safe-area-inset-bottom))}
+
+header{display:flex; flex-direction:column; gap:8px; padding:6px 0 10px}
+.row{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+.row.right{justify-content:flex-end}
+.lbl{color:var(--muted); font-size:.85rem; white-space:nowrap}
+button{font:inherit; color:var(--text); background:var(--panel2); border:1px solid var(--line);
+  border-radius:10px; padding:10px 16px; min-height:44px; cursor:pointer}
+button:active{transform:scale(.97)}
+button.primary{background:var(--accent); border-color:var(--accent); color:#06233f; font-weight:700; min-width:84px}
+button.primary.stop{background:#ff8f5a; border-color:#ff8f5a; color:#3a1600}
+button.ghost{background:transparent}
+button.danger{border-color:var(--ng); color:var(--ng); background:transparent}
+
+.seg,.chips{display:flex; gap:4px; flex-wrap:wrap}
+.seg label input,.chips label input{position:absolute; opacity:0; pointer-events:none}
+.seg label span,.chips label span{display:inline-flex; align-items:center; justify-content:center;
+  min-height:38px; min-width:44px; padding:6px 12px; border:1px solid var(--line); border-radius:9px;
+  background:var(--panel); color:var(--muted); font-size:.9rem; cursor:pointer}
+.seg label input:checked+span{background:var(--accent); border-color:var(--accent); color:#06233f; font-weight:700}
+.chips label input:checked+span{background:#1d3a5f; border-color:var(--accent); color:var(--text); font-weight:600}
+input[type=range]{width:120px; accent-color:var(--accent)}
+input[type=range]:disabled{opacity:.35}
+#timeVal{display:inline-block; min-width:34px}
+
+#qbar{min-height:44px; display:flex; align-items:center; justify-content:center; text-align:center;
+  background:var(--panel); border:1px solid var(--line); border-radius:12px;
+  padding:8px 12px; font-size:1.05rem; margin-bottom:8px}
+#qbar.ok{border-color:var(--ok); color:var(--ok)}
+#qbar.ng{border-color:var(--ng); color:var(--ng)}
+
+#timerWrap{height:8px; background:var(--panel2); border-radius:4px; overflow:hidden; margin-bottom:8px}
+#timerFill{height:100%; width:100%; background:var(--accent); border-radius:4px}
+
+#boardWrap,.heatWrap{overflow-x:auto; -webkit-overflow-scrolling:touch;
+  background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:6px}
+#board,#heatBoard{display:block; width:100%; height:auto}
+.hit{cursor:pointer}
+.slabel{fill:var(--muted); font-size:16px; font-weight:700; text-anchor:middle; dominant-baseline:central}
+.fnum{fill:var(--muted); font-size:11px; text-anchor:middle}
+.mq{fill:rgba(77,163,255,.28); stroke:var(--accent); stroke-width:3; animation:pulse 1.2s ease-in-out infinite}
+.mok{fill:var(--ok); stroke:rgba(255,255,255,.35); stroke-width:1.5}
+.mng{fill:rgba(255,82,82,.88)}
+.mtxt{fill:#08321a; font-weight:700; text-anchor:middle; dominant-baseline:central}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+
+#answerArea{margin-top:10px}
+#noteButtons{display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:6px}
+.notebtn{min-height:52px; padding:6px 2px; line-height:1.15; font-size:1.05rem; font-weight:700}
+.notebtn small{display:block; font-size:.72rem; font-weight:400; color:var(--muted)}
+.notebtn.ok{background:#14532d; border-color:var(--ok); color:#c9ffe0}
+.notebtn.ok small{color:#8fd9ae}
+.notebtn.ng{animation:shake .4s; background:#5b2020; border-color:var(--ng); color:#ffb4b4}
+.notebtn.ng small{color:#e79a9a}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+@media (max-width:480px){ #noteButtons{grid-template-columns:repeat(4,minmax(0,1fr))} }
+
+#qbig{min-height:110px; display:flex; align-items:center; justify-content:center; text-align:center;
+  background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; font-size:1.35rem}
+#qbig b{color:var(--accent)}
+#qbig b.acc{color:var(--ok)}
+
+#footer{margin-top:10px; text-align:center; color:var(--text); font-size:1rem}
+#kbdHint{margin-top:4px; text-align:center; color:var(--muted); font-size:.78rem}
+@media (hover:none){ #kbdHint{display:none} }
+
+#statsPanel,#examPanel{position:fixed; inset:0; background:rgba(0,0,0,.6); display:flex;
+  align-items:center; justify-content:center; padding:16px; z-index:10}
+.scoreBig{font-size:2.2rem; font-weight:800; margin:4px 0}
+#examWrongList{margin:6px 0; padding-left:20px}
+#examWrongList li{margin:4px 0; color:var(--text)}
+.panelCard{background:var(--panel); border:1px solid var(--line); border-radius:14px;
+  padding:18px; max-width:760px; width:100%; max-height:90vh; overflow-y:auto}
+.panelCard h2{margin:0 0 10px}
+.panelCard h3{margin:16px 0 8px; font-size:.95rem; color:var(--muted)}
+.panelCard p{margin:6px 0}
+.muted{color:var(--muted); font-size:.85rem; margin-top:6px}
+#heatBoard{min-width:640px}
+
+#toast{position:fixed; left:50%; bottom:90px; transform:translateX(-50%);
+  background:#2b333e; color:var(--text); border:1px solid var(--line); border-radius:10px;
+  padding:10px 16px; opacity:0; pointer-events:none; transition:opacity .25s; z-index:20; white-space:nowrap}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="row">
+      <button id="startBtn" class="primary">시작</button>
+      <div class="seg">
+        <label><input type="radio" name="mode" value="A" checked><span>지판→음</span></label>
+        <label><input type="radio" name="mode" value="B"><span>음→지판</span></label>
+      </div>
+      <button id="statsBtn" class="ghost">통계</button>
+    </div>
+    <div class="row">
+      <span class="lbl">범위</span>
+      <div class="seg">
+        <label><input type="radio" name="range" value="5"><span>0~5</span></label>
+        <label><input type="radio" name="range" value="12" checked><span>0~12</span></label>
+        <label><input type="radio" name="range" value="21"><span>0~21</span></label>
+      </div>
+      <span class="lbl">현</span>
+      <div class="chips" id="strChips">
+        <label><input type="checkbox" data-si="3" checked><span>E</span></label>
+        <label><input type="checkbox" data-si="2" checked><span>A</span></label>
+        <label><input type="checkbox" data-si="1" checked><span>D</span></label>
+        <label><input type="checkbox" data-si="0" checked><span>G</span></label>
+      </div>
+    </div>
+    <div class="row">
+      <span class="lbl">진행</span>
+      <div class="seg">
+        <label><input type="radio" name="pace" value="free" checked><span>자율</span></label>
+        <label><input type="radio" name="pace" value="timed"><span>제한시간</span></label>
+      </div>
+      <input type="range" id="timeSlider" min="1" max="10" step="1" value="5" disabled>
+      <span id="timeVal" class="lbl">5초</span>
+      <div class="chips"><label><input type="checkbox" id="soundChk" checked><span>소리</span></label></div>
+    </div>
+    <div class="row">
+      <span class="lbl">시험</span>
+      <div class="seg">
+        <label><input type="radio" name="examn" value="10" checked><span>10문제</span></label>
+        <label><input type="radio" name="examn" value="20"><span>20문제</span></label>
+        <label><input type="radio" name="examn" value="50"><span>50문제</span></label>
+      </div>
+      <button id="examBtn">시험 시작</button>
+    </div>
+  </header>
+
+  <div id="qbar">시작 버튼을 눌러 훈련을 시작하세요</div>
+  <div id="timerWrap" hidden><div id="timerFill"></div></div>
+  <div id="boardWrap"><svg id="board" xmlns="http://www.w3.org/2000/svg"></svg></div>
+
+  <div id="answerArea">
+    <div id="noteButtons"></div>
+    <div id="qbig" hidden></div>
+  </div>
+
+  <div id="footer">정답 0 / 0 (0%) · 평균 -</div>
+  <div id="kbdHint">키보드 입력: C D E F G A B 키 · ♯은 Shift+키</div>
+</div>
+
+<div id="statsPanel" hidden>
+  <div class="panelCard">
+    <h2>통계</h2>
+    <div id="statLines"></div>
+    <h3>오답 히트맵 (0~21프렛 · 누적)</h3>
+    <div class="heatWrap"><svg id="heatBoard" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    <div id="heatLegend" class="muted"></div>
+    <div class="row right" style="margin-top:14px">
+      <button id="resetStats" class="danger">누적 통계 초기화</button>
+      <button id="closeStats">닫기</button>
+    </div>
+  </div>
+</div>
+
+<div id="examPanel" hidden>
+  <div class="panelCard">
+    <h2>시험 결과</h2>
+    <div id="examScore" class="scoreBig"></div>
+    <div id="examSub" class="muted"></div>
+    <h3 id="examWrongTitle">오답</h3>
+    <ul id="examWrongList"></ul>
+    <div class="row right" style="margin-top:14px">
+      <button id="examRetry" class="primary">다시 시험</button>
+      <button id="closeExam">닫기</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+'use strict';
+
+/* ===== 음/현 정의 (이명동음은 전부 # 기준) ===== */
+var NOTE_EN=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+var NOTE_KO=['도','도♯','레','레♯','미','파','파♯','솔','솔♯','라','라♯','시'];
+function label(i){ return NOTE_EN[i]+'('+NOTE_KO[i]+')'; }
+/* 표시 순서: 위에서부터 G, D, A, E (지판을 내려다보는 시점) */
+var STR=[
+  {name:'G', open:7, freq:97.999},
+  {name:'D', open:2, freq:73.416},
+  {name:'A', open:9, freq:55.000},
+  {name:'E', open:4, freq:41.203}
+];
+function noteAt(s,f){ return (STR[s].open+f)%12; }
+function freqAt(s,f){ return STR[s].freq*Math.pow(2,f/12); }
+
+/* ===== DOM ===== */
+var $=function(id){ return document.getElementById(id); };
+var boardSvg=$('board'), qbar=$('qbar'), qbig=$('qbig'), footer=$('footer');
+var noteButtonsEl=$('noteButtons'), startBtn=$('startBtn');
+var timerWrap=$('timerWrap'), timerFill=$('timerFill');
+var timeSlider=$('timeSlider'), timeVal=$('timeVal'), soundChk=$('soundChk');
+var statsPanel=$('statsPanel'), statLines=$('statLines'), heatLegend=$('heatLegend');
+var toastEl=$('toast');
+
+function getMode(){ return document.querySelector('input[name=mode]:checked').value; }
+function getRange(){ return +document.querySelector('input[name=range]:checked').value; }
+function getPace(){ return document.querySelector('input[name=pace]:checked').value; }
+function isTimed(){ return getPace()==='timed'; }
+function timeLimit(){ return +timeSlider.value; }
+function soundOn(){ return soundChk.checked; }
+function strInputs(){ return Array.prototype.slice.call($('strChips').querySelectorAll('input')); }
+function enabledStrings(){ return strInputs().filter(function(c){return c.checked;}).map(function(c){return +c.dataset.si;}); }
+
+/* ===== 지판 SVG 렌더링 =====
+   프렛 위치는 실제 비율: 넛에서 n프렛까지 거리 = 1 - 2^(-n/12) (선택 범위로 정규화) */
+function buildBoard(svg, maxFret, interactive){
+  var W=1000,H=272,TOP=16,BOT=236,NUT=90,END=996,OPEN_L=28;
+  var bandH=(BOT-TOP)/4;
+  var ys=[0,1,2,3].map(function(i){ return TOP+bandH*(i+0.5); });
+  var pos=[0];
+  for(var n=1;n<=maxFret;n++) pos.push(1-Math.pow(2,-n/12));
+  var tot=pos[maxFret];
+  function fx(n){ return NUT+(pos[n]/tot)*(END-NUT); }
+  function cl(n){ return n===0?OPEN_L:fx(n-1); }
+  function cr(n){ return n===0?NUT:fx(n); }
+  function cx(n){ return (cl(n)+cr(n))/2; }
+  function rad(n){ return Math.max(7,Math.min(21,(cr(n)-cl(n))/2-3,bandH*0.42)); }
+
+  var s='';
+  s+='<rect x="'+OPEN_L+'" y="'+TOP+'" width="'+(NUT-OPEN_L)+'" height="'+(BOT-TOP)+'" fill="#171b21" rx="4"/>';
+  s+='<rect x="'+NUT+'" y="'+TOP+'" width="'+(END-NUT)+'" height="'+(BOT-TOP)+'" fill="#26201a" rx="3"/>';
+  var mid=(TOP+BOT)/2;
+  [3,5,7,9,15,17,19].forEach(function(n){
+    if(n<=maxFret) s+='<circle cx="'+cx(n)+'" cy="'+mid+'" r="7" fill="#4a3f31"/>';
+  });
+  if(maxFret>=12){
+    s+='<circle cx="'+cx(12)+'" cy="'+(TOP+bandH)+'" r="7" fill="#4a3f31"/>';
+    s+='<circle cx="'+cx(12)+'" cy="'+(BOT-bandH)+'" r="7" fill="#4a3f31"/>';
+  }
+  for(n=1;n<=maxFret;n++)
+    s+='<line x1="'+fx(n)+'" y1="'+TOP+'" x2="'+fx(n)+'" y2="'+BOT+'" stroke="#59636f" stroke-width="2.2"/>';
+  s+='<line x1="'+NUT+'" y1="'+(TOP-3)+'" x2="'+NUT+'" y2="'+(BOT+3)+'" stroke="#e4ddcf" stroke-width="8"/>';
+  var sw=[2,2.8,3.7,4.6];
+  ys.forEach(function(y,i){
+    s+='<line x1="'+OPEN_L+'" y1="'+y+'" x2="'+END+'" y2="'+y+'" stroke="#a7b0ba" stroke-width="'+sw[i]+'"/>';
+    s+='<text class="slabel" x="13" y="'+y+'">'+STR[i].name+'</text>';
+  });
+  for(n=0;n<=maxFret;n++)
+    s+='<text class="fnum" x="'+cx(n)+'" y="260">'+n+'</text>';
+  s+='<g data-marks></g>';
+  if(interactive){
+    for(var si=0;si<4;si++)
+      for(n=0;n<=maxFret;n++)
+        s+='<rect class="hit" data-s="'+si+'" data-f="'+n+'" x="'+cl(n)+'" y="'+(ys[si]-bandH/2)+
+           '" width="'+(cr(n)-cl(n))+'" height="'+bandH+'" fill="transparent"/>';
+  }
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  svg.innerHTML=s;
+  return {ys:ys, cx:cx, rad:rad, marks:svg.querySelector('[data-marks]')};
+}
+
+var G=null;
+function rebuildBoard(){
+  G=buildBoard(boardSvg, getRange(), true);
+  boardSvg.style.minWidth={5:'0',12:'560px',21:'860px'}[getRange()];
+}
+
+function addMark(s,f,kind,text){
+  var r=G.rad(f), x=G.cx(f), y=G.ys[s], el='';
+  if(kind==='q') el='<circle class="mq" cx="'+x+'" cy="'+y+'" r="'+r+'"/>';
+  else if(kind==='ok'){
+    el='<circle class="mok" cx="'+x+'" cy="'+y+'" r="'+r+'"/>';
+    if(text&&r>=11) el+='<text class="mtxt" x="'+x+'" y="'+y+'" font-size="'+Math.min(16,r*1.05)+'">'+text+'</text>';
+  }
+  else if(kind==='ng') el='<circle class="mng" cx="'+x+'" cy="'+y+'" r="'+r+'"/>';
+  G.marks.insertAdjacentHTML('beforeend',el);
+}
+function clearMarks(){ if(G) G.marks.innerHTML=''; }
+
+/* ===== 소리 (Web Audio) ===== */
+var ctx=null;
+function initAudio(){
+  try{
+    if(!ctx) ctx=new (window.AudioContext||window.webkitAudioContext)();
+    if(ctx.state==='suspended') ctx.resume();
+  }catch(e){}
+}
+function tone(freq,t,dur,vol,type){
+  var o=ctx.createOscillator(), g=ctx.createGain();
+  o.type=type||'triangle'; o.frequency.value=freq;
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(vol,t+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g); g.connect(ctx.destination);
+  o.start(t); o.stop(t+dur+0.05);
+}
+function playPos(s,f,delay){
+  if(!soundOn()||!ctx) return;
+  var t=ctx.currentTime+(delay||0.02), fr=freqAt(s,f);
+  tone(fr,t,0.9,0.45);          /* 기본음 */
+  tone(fr*2,t,0.8,0.15);        /* 한 옥타브 위 보강 (모바일 스피커에서 저음 인지 보조) */
+}
+function sfx(ok){
+  if(!soundOn()||!ctx) return;
+  var t=ctx.currentTime+0.01;
+  if(ok){ tone(660,t,0.08,0.12,'sine'); tone(990,t+0.09,0.12,0.12,'sine'); }
+  else  { tone(320,t,0.12,0.12,'sine'); tone(214,t+0.13,0.2,0.12,'sine'); }
+}
+function gradeSound(ok,s,f){ sfx(ok); playPos(s,f,0.28); }
+
+/* ===== 통계 (localStorage 누적) ===== */
+var LSKEY='bassTrainerStats_v1';
+function freshStore(){ return {total:0,correct:0,rtSum:0,rtN:0,heat:{},exams:[]}; }
+function loadStore(){
+  try{
+    var j=JSON.parse(localStorage.getItem(LSKEY));
+    if(j&&typeof j.total==='number'&&j.heat){ if(!j.exams) j.exams=[]; return j; }
+  }catch(e){}
+  return freshStore();
+}
+function saveStore(){ try{ localStorage.setItem(LSKEY,JSON.stringify(store)); }catch(e){} }
+var store=loadStore();
+var session={total:0,correct:0,rtSum:0,rtN:0};
+
+function record(ok,rt,heatPos){
+  session.total++; store.total++;
+  if(ok){ session.correct++; store.correct++; }
+  if(rt!=null){ session.rtSum+=rt; session.rtN++; store.rtSum+=rt; store.rtN++; }
+  if(!ok&&heatPos){
+    var k=heatPos.s+','+heatPos.f;
+    store.heat[k]=(store.heat[k]||0)+1;
+  }
+  saveStore(); updateFooter();
+}
+function pctOf(o){ return o.total? Math.round(o.correct/o.total*100):0; }
+function avgOf(o){ return o.rtN? (o.rtSum/o.rtN).toFixed(1)+'초':'-'; }
+function updateFooter(){
+  footer.textContent='정답 '+session.correct+' / '+session.total+' ('+pctOf(session)+'%) · 평균 '+avgOf(session);
+}
+
+/* ===== 제한 시간 타이머 ===== */
+var tEnd=0, tDur=0, rafId=0;
+function startTimer(){
+  tDur=timeLimit()*1000; tEnd=performance.now()+tDur;
+  timerWrap.hidden=false; timerFill.style.width='100%';
+  cancelAnimationFrame(rafId); tickTimer();
+}
+function tickTimer(){
+  var rem=tEnd-performance.now();
+  if(rem<=0){ timerFill.style.width='0%'; onTimeout(); return; }
+  timerFill.style.width=(rem/tDur*100)+'%';
+  rafId=requestAnimationFrame(tickTimer);
+}
+function stopTimer(){ cancelAnimationFrame(rafId); timerWrap.hidden=true; }
+
+/* ===== 출제/채점 ===== */
+var FB_OK=900, FB_NG=2000;
+var running=false, state='idle', cur=null, lastKey='', askedAt=0, nextTid=null;
+var exam=null; /* {total,num,correct,rtSum,rtN,wrongs[]} — null이면 연습 모드 */
+
+function rand(n){ return Math.floor(Math.random()*(n+1)); }
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+function newQuestion(){
+  clearTimeout(nextTid); stopTimer(); clearMarks(); clearBtnFx();
+  var ss=enabledStrings(), R=getRange(), guard=0, s,f,key;
+  if(getMode()==='A'){
+    do{ s=pick(ss); f=rand(R); key='A'+s+':'+f; }while(key===lastKey&&guard++<50);
+    lastKey=key;
+    cur={s:s,f:f,note:noteAt(s,f)};
+    addMark(s,f,'q');
+    askQbar('하이라이트된 위치의 음 이름은?');
+  }else{
+    var note;
+    do{ s=pick(ss); f=rand(R); note=noteAt(s,f); key='B'+s+':'+note; }while(key===lastKey&&guard++<50);
+    lastKey=key;
+    var corrects=[];
+    for(var n=0;n<=R;n++) if(noteAt(s,n)===note) corrects.push(n);
+    cur={s:s,note:note,corrects:corrects};
+    qbig.innerHTML='<b>'+STR[s].name+'현</b>에서 <b class="acc">'+label(note)+'</b> 의 위치는?';
+    askQbar('지판에서 해당 프렛을 탭하세요');
+  }
+  state='asking'; askedAt=performance.now();
+  if(isTimed()) startTimer();
+}
+
+function setQbar(text,cls){ qbar.textContent=text; qbar.className=cls||''; }
+function askQbar(t){ setQbar((exam?('문제 '+(exam.num+1)+'/'+exam.total+' · '):'')+t,''); }
+
+function finishQuestion(ok,rt,heatPos,delay,wrongDesc){
+  record(ok,rt,heatPos);
+  if(exam){
+    exam.num++;
+    if(ok) exam.correct++;
+    if(rt!=null){ exam.rtSum+=rt; exam.rtN++; }
+    if(!ok&&wrongDesc) exam.wrongs.push(wrongDesc);
+  }
+  nextTid=setTimeout(function(){
+    if(!running) return;
+    if(exam&&exam.num>=exam.total) finishExam();
+    else newQuestion();
+  },delay);
+}
+
+/* 모드 A: 음 버튼 채점 */
+function answerA(idx){
+  if(!running||state!=='asking'||getMode()!=='A') return;
+  stopTimer(); state='feedback';
+  var rt=(performance.now()-askedAt)/1000;
+  var ok=(idx===cur.note);
+  clearMarks();
+  addMark(cur.s,cur.f,'ok',NOTE_EN[cur.note]);
+  if(ok){
+    btnEls[idx].classList.add('ok');
+    setQbar('정답! '+label(cur.note),'ok');
+  }else{
+    btnEls[idx].classList.add('ng');
+    btnEls[cur.note].classList.add('ok');
+    setQbar('오답 — 정답: '+label(cur.note),'ng');
+  }
+  gradeSound(ok,cur.s,cur.f);
+  finishQuestion(ok,rt,{s:cur.s,f:cur.f},ok?FB_OK:FB_NG,
+    ok?null:STR[cur.s].name+'현 '+cur.f+'프렛 = '+label(cur.note)+' (내 답: '+label(idx)+')');
+}
+
+/* 모드 B: 지판 탭 채점 */
+function tapCell(s,f){
+  if(!running||state!=='asking'||getMode()!=='B') return;
+  if(s!==cur.s){ toast(STR[cur.s].name+'현에서 답하세요'); return; }
+  stopTimer(); state='feedback';
+  var rt=(performance.now()-askedAt)/1000;
+  var ok=cur.corrects.indexOf(f)>=0;
+  if(ok){
+    addMark(s,f,'ok',NOTE_EN[cur.note]);
+    setQbar('정답! '+label(cur.note),'ok');
+    gradeSound(true,s,f);
+    finishQuestion(true,rt,null,FB_OK);
+  }else{
+    addMark(s,f,'ng');
+    cur.corrects.forEach(function(c){ addMark(s,c,'ok',NOTE_EN[cur.note]); });
+    var near=cur.corrects.reduce(function(a,b){ return Math.abs(b-f)<Math.abs(a-f)?b:a; });
+    setQbar('오답 — 정답 위치는 초록색','ng');
+    gradeSound(false,s,near);
+    finishQuestion(false,rt,{s:s,f:near},FB_NG,
+      STR[s].name+'현 '+label(cur.note)+' = '+cur.corrects.join(', ')+'프렛 (내 답: '+f+'프렛)');
+  }
+}
+
+/* 시간 초과 */
+function onTimeout(){
+  if(!running||state!=='asking') return;
+  state='feedback'; stopTimer();
+  if(getMode()==='A'){
+    clearMarks();
+    addMark(cur.s,cur.f,'ok',NOTE_EN[cur.note]);
+    btnEls[cur.note].classList.add('ok');
+    setQbar('시간 초과 — 정답: '+label(cur.note),'ng');
+    gradeSound(false,cur.s,cur.f);
+    finishQuestion(false,null,{s:cur.s,f:cur.f},2000,
+      STR[cur.s].name+'현 '+cur.f+'프렛 = '+label(cur.note)+' (시간 초과)');
+  }else{
+    cur.corrects.forEach(function(c){ addMark(cur.s,c,'ok',NOTE_EN[cur.note]); });
+    setQbar('시간 초과 — 정답 위치는 초록색','ng');
+    gradeSound(false,cur.s,cur.corrects[0]);
+    finishQuestion(false,null,{s:cur.s,f:cur.corrects[0]},2000,
+      STR[cur.s].name+'현 '+label(cur.note)+' = '+cur.corrects.join(', ')+'프렛 (시간 초과)');
+  }
+}
+
+/* ===== 시작/정지 ===== */
+function start(){
+  running=true; startBtn.textContent='정지'; startBtn.classList.add('stop');
+  initAudio();               /* iOS: 사용자 터치 시점에 AudioContext 초기화 */
+  newQuestion();
+}
+function stop(){
+  running=false; state='idle'; exam=null;
+  startBtn.textContent='시작'; startBtn.classList.remove('stop');
+  clearTimeout(nextTid); stopTimer(); clearMarks(); clearBtnFx();
+  qbig.innerHTML='';
+  setQbar('시작 버튼을 눌러 훈련을 시작하세요','');
+}
+startBtn.addEventListener('click',function(){ running?stop():start(); });
+
+/* ===== 시험 모드 ===== */
+function pad2(n){ return (n<10?'0':'')+n; }
+function startExam(){
+  if(running) stop();
+  $('examPanel').hidden=true;
+  exam={total:+document.querySelector('input[name=examn]:checked').value,
+        num:0,correct:0,rtSum:0,rtN:0,wrongs:[]};
+  start();
+}
+function finishExam(){
+  var e=exam;
+  stop();
+  var pct=e.total?Math.round(e.correct/e.total*100):0;
+  var d=new Date();
+  var rec={date:d.getFullYear()+'-'+pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+' '+pad2(d.getHours())+':'+pad2(d.getMinutes()),
+           total:e.total, correct:e.correct, mode:getMode(), range:getRange(),
+           avg:e.rtN? +(e.rtSum/e.rtN).toFixed(1):null};
+  store.exams.unshift(rec); store.exams=store.exams.slice(0,20); saveStore();
+  $('examScore').textContent=e.correct+' / '+e.total+' ('+pct+'%)';
+  var msg=pct>=90?'훌륭해요!':pct>=70?'잘했어요!':'조금 더 연습해 볼까요?';
+  $('examSub').textContent=msg+(rec.avg!=null?' · 평균 반응 '+rec.avg+'초':'');
+  var wl=$('examWrongList');
+  wl.innerHTML=e.wrongs.map(function(w){ return '<li>'+w+'</li>'; }).join('');
+  $('examWrongTitle').hidden=wl.hidden=(e.wrongs.length===0);
+  $('examPanel').hidden=false;
+}
+$('examBtn').addEventListener('click',startExam);
+$('examRetry').addEventListener('click',startExam);
+$('closeExam').addEventListener('click',function(){ $('examPanel').hidden=true; });
+$('examPanel').addEventListener('click',function(e){ if(e.target===$('examPanel')) $('examPanel').hidden=true; });
+
+/* ===== 음 버튼 생성 ===== */
+var btnEls=[];
+NOTE_EN.forEach(function(en,i){
+  var b=document.createElement('button');
+  b.className='notebtn';
+  b.innerHTML=en+'<small>('+NOTE_KO[i]+')</small>';
+  b.addEventListener('click',function(){ answerA(i); });
+  noteButtonsEl.appendChild(b); btnEls.push(b);
+});
+function clearBtnFx(){ btnEls.forEach(function(b){ b.classList.remove('ok','ng'); }); }
+
+/* ===== 지판 탭 (이벤트 위임) ===== */
+boardSvg.addEventListener('click',function(e){
+  var hit=e.target.closest('.hit');
+  if(hit) tapCell(+hit.dataset.s,+hit.dataset.f);
+});
+
+/* ===== 키보드 입력 (Mac): 자연음은 키, ♯은 Shift+키 ===== */
+document.addEventListener('keydown',function(e){
+  if(e.metaKey||e.ctrlKey||e.altKey) return;
+  if(!statsPanel.hidden) return;
+  var base={c:0,d:2,e:4,f:5,g:7,a:9,b:11}[e.key.toLowerCase()];
+  if(base==null) return;
+  var idx=base;
+  if(e.shiftKey){
+    if(base===4||base===11) return;   /* E#, B# 없음 */
+    idx=base+1;
+  }
+  if(running&&state==='asking'&&getMode()==='A'){ e.preventDefault(); answerA(idx); }
+});
+
+/* ===== 설정 변경 ===== */
+function applyModeUI(){
+  var B=(getMode()==='B');
+  noteButtonsEl.hidden=B; qbig.hidden=!B;
+  if(!B) qbig.innerHTML='';
+}
+function settingsChanged(rebuild){
+  if(rebuild) rebuildBoard();
+  if(exam){ stop(); toast('설정이 바뀌어 시험을 중단했습니다'); }
+  else if(running) newQuestion();
+  else { clearMarks(); clearBtnFx(); }
+}
+document.querySelectorAll('input[name=mode]').forEach(function(r){
+  r.addEventListener('change',function(){ applyModeUI(); settingsChanged(false); });
+});
+document.querySelectorAll('input[name=range]').forEach(function(r){
+  r.addEventListener('change',function(){ settingsChanged(true); });
+});
+document.querySelectorAll('input[name=pace]').forEach(function(r){
+  r.addEventListener('change',function(){
+    timeSlider.disabled=!isTimed();
+    settingsChanged(false);
+  });
+});
+timeSlider.addEventListener('input',function(){ timeVal.textContent=timeSlider.value+'초'; });
+strInputs().forEach(function(c){
+  c.addEventListener('change',function(){
+    if(enabledStrings().length===0){ c.checked=true; toast('최소 한 현은 선택해야 합니다'); return; }
+    settingsChanged(false);
+  });
+});
+
+/* ===== 통계 패널 / 히트맵 ===== */
+function renderStats(){
+  statLines.innerHTML=
+    '<p>이번 세션 — 정답 '+session.correct+' / '+session.total+' ('+pctOf(session)+'%) · 평균 반응 '+avgOf(session)+'</p>'+
+    '<p>누적 — 정답 '+store.correct+' / '+store.total+' ('+pctOf(store)+'%) · 평균 반응 '+avgOf(store)+'</p>';
+  var g=buildBoard($('heatBoard'),21,false);
+  var entries=Object.keys(store.heat).map(function(k){ return [k,store.heat[k]]; });
+  var max=entries.reduce(function(m,e){ return Math.max(m,e[1]); },0);
+  entries.forEach(function(e){
+    var p=e[0].split(','), s=+p[0], f=+p[1];
+    if(s<0||s>3||f<0||f>21) return;
+    var op=(0.25+0.65*(e[1]/max)).toFixed(2);
+    g.marks.insertAdjacentHTML('beforeend',
+      '<circle cx="'+g.cx(f)+'" cy="'+g.ys[s]+'" r="'+g.rad(f)+'" fill="rgba(255,82,82,'+op+')"/>');
+  });
+  heatLegend.textContent=max? '가장 진한 위치 = 오답 '+max+'회':'아직 오답 기록이 없습니다';
+  var ex=store.exams||[];
+  if(ex.length){
+    statLines.innerHTML+='<h3>최근 시험</h3>'+ex.slice(0,10).map(function(r){
+      return '<p class="muted">'+r.date+' · '+(r.mode==='A'?'지판→음':'음→지판')+' · 0~'+r.range+'프렛 · '+
+             r.correct+'/'+r.total+' ('+Math.round(r.correct/r.total*100)+'%)'+
+             (r.avg!=null?' · 평균 '+r.avg+'초':'')+'</p>';
+    }).join('');
+  }
+}
+$('statsBtn').addEventListener('click',function(){
+  if(running) stop();          /* 패널 뒤에서 출제·타이머가 돌지 않도록 정지 */
+  renderStats(); statsPanel.hidden=false;
+});
+$('closeStats').addEventListener('click',function(){ statsPanel.hidden=true; });
+$('resetStats').addEventListener('click',function(){
+  if(confirm('누적 통계를 초기화할까요?')){ store=freshStore(); saveStore(); renderStats(); }
+});
+statsPanel.addEventListener('click',function(e){ if(e.target===statsPanel) statsPanel.hidden=true; });
+
+/* ===== 토스트 ===== */
+var toastTid=null;
+function toast(msg){
+  toastEl.textContent=msg; toastEl.classList.add('show');
+  clearTimeout(toastTid);
+  toastTid=setTimeout(function(){ toastEl.classList.remove('show'); },1200);
+}
+
+/* ===== 초기화 ===== */
+rebuildBoard();
+applyModeUI();
+updateFooter();
+})();
+</script>
+</body>
+</html>

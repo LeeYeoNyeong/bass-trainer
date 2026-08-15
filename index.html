@@ -111,6 +111,7 @@ input[type=range]:disabled{opacity:.35}
       <div class="seg">
         <label><input type="radio" name="mode" value="A" checked><span>지판→음</span></label>
         <label><input type="radio" name="mode" value="B"><span>음→지판</span></label>
+        <label><input type="radio" name="mode" value="C"><span>전체 찾기</span></label>
       </div>
       <button id="statsBtn" class="ghost">통계</button>
     </div>
@@ -388,6 +389,18 @@ function newQuestion(){
     cur={s:s,f:f,note:noteAt(s,f)};
     addMark(s,f,'q');
     askQbar('하이라이트된 위치의 음 이름은?');
+  }else if(getMode()==='C'){
+    var noteC;
+    do{ s=pick(ss); f=rand(R); noteC=noteAt(s,f); key='C'+noteC; }while(key===lastKey&&guard++<50);
+    lastKey=key;
+    var all=[];
+    [0,1,2,3].forEach(function(si){
+      if(ss.indexOf(si)<0) return;
+      for(var n=0;n<=R;n++) if(noteAt(si,n)===noteC) all.push({s:si,f:n});
+    });
+    cur={note:noteC,corrects:all,found:[]};
+    updateQbigC();
+    askQbar('해당 음이 나는 모든 위치를 탭하세요');
   }else{
     var note;
     do{ s=pick(ss); f=rand(R); note=noteAt(s,f); key='B'+s+':'+note; }while(key===lastKey&&guard++<50);
@@ -441,9 +454,49 @@ function answerA(idx){
     ok?null:STR[cur.s].name+'현 '+cur.f+'프렛 = '+label(cur.note)+' (내 답: '+label(idx)+')');
 }
 
-/* 모드 B: 지판 탭 채점 */
+/* 모드 B/C: 지판 탭 채점 */
+function updateQbigC(){
+  qbig.innerHTML='<b class="acc">'+label(cur.note)+'</b> 의 모든 위치를 탭하세요 ('+
+    cur.found.length+'/'+cur.corrects.length+')';
+}
+function posList(list){ return list.map(function(c){ return STR[c.s].name+c.f; }).join(' '); }
+
+/* 모드 C: 같은 음 전체 위치 찾기 */
+function tapCellC(s,f){
+  var k=s+','+f;
+  var isCorrect=cur.corrects.some(function(c){ return c.s===s&&c.f===f; });
+  if(isCorrect){
+    if(cur.found.indexOf(k)>=0) return;      /* 이미 찾은 위치 */
+    cur.found.push(k);
+    addMark(s,f,'ok',NOTE_EN[cur.note]);
+    playPos(s,f);
+    updateQbigC();
+    if(cur.found.length===cur.corrects.length){
+      state='feedback'; stopTimer();
+      var rt=(performance.now()-askedAt)/1000;
+      setQbar('정답! '+label(cur.note)+' '+cur.corrects.length+'곳 모두 찾음','ok');
+      sfx(true);
+      finishQuestion(true,rt,null,FB_OK);
+    }
+    return;
+  }
+  state='feedback'; stopTimer();
+  var rt=(performance.now()-askedAt)/1000;
+  addMark(s,f,'ng');
+  var remain=cur.corrects.filter(function(c){ return cur.found.indexOf(c.s+','+c.f)<0; });
+  remain.forEach(function(c){ addMark(c.s,c.f,'ok',NOTE_EN[cur.note]); });
+  setQbar('오답 — 남은 위치는 초록색','ng');
+  var near=remain.reduce(function(a,b){ return Math.abs(b.f-f)<Math.abs(a.f-f)?b:a; },remain[0]);
+  gradeSound(false,near.s,near.f);
+  finishQuestion(false,rt,{s:near.s,f:near.f},FB_NG,
+    label(cur.note)+' 전체 = '+posList(cur.corrects)+' (내 답: '+STR[s].name+'현 '+f+'프렛)');
+}
+
 function tapCell(s,f){
-  if(!running||state!=='asking'||getMode()!=='B') return;
+  if(!running||state!=='asking') return;
+  var m=getMode();
+  if(m==='A') return;
+  if(m==='C'){ tapCellC(s,f); return; }
   if(s!==cur.s){ toast(STR[cur.s].name+'현에서 답하세요'); return; }
   stopTimer(); state='feedback';
   var rt=(performance.now()-askedAt)/1000;
@@ -476,6 +529,14 @@ function onTimeout(){
     gradeSound(false,cur.s,cur.f);
     finishQuestion(false,null,{s:cur.s,f:cur.f},2000,
       STR[cur.s].name+'현 '+cur.f+'프렛 = '+label(cur.note)+' (시간 초과)');
+  }else if(getMode()==='C'){
+    var remain=cur.corrects.filter(function(c){ return cur.found.indexOf(c.s+','+c.f)<0; });
+    remain.forEach(function(c){ addMark(c.s,c.f,'ok',NOTE_EN[cur.note]); });
+    setQbar('시간 초과 — 남은 위치는 초록색','ng');
+    var r0=remain[0]||cur.corrects[0];
+    gradeSound(false,r0.s,r0.f);
+    finishQuestion(false,null,{s:r0.s,f:r0.f},2000,
+      label(cur.note)+' 전체 = '+posList(cur.corrects)+' (시간 초과, '+cur.found.length+'/'+cur.corrects.length+' 찾음)');
   }else{
     cur.corrects.forEach(function(c){ addMark(cur.s,c,'ok',NOTE_EN[cur.note]); });
     setQbar('시간 초과 — 정답 위치는 초록색','ng');
@@ -564,9 +625,9 @@ document.addEventListener('keydown',function(e){
 
 /* ===== 설정 변경 ===== */
 function applyModeUI(){
-  var B=(getMode()==='B');
-  noteButtonsEl.hidden=B; qbig.hidden=!B;
-  if(!B) qbig.innerHTML='';
+  var tap=(getMode()!=='A');   /* B·C 모드는 지판 탭으로 답함 → 음 버튼 대신 문제 표시 */
+  noteButtonsEl.hidden=tap; qbig.hidden=!tap;
+  if(!tap) qbig.innerHTML='';
 }
 function settingsChanged(rebuild){
   if(rebuild) rebuildBoard();
@@ -613,7 +674,7 @@ function renderStats(){
   var ex=store.exams||[];
   if(ex.length){
     statLines.innerHTML+='<h3>최근 시험</h3>'+ex.slice(0,10).map(function(r){
-      return '<p class="muted">'+r.date+' · '+(r.mode==='A'?'지판→음':'음→지판')+' · 0~'+r.range+'프렛 · '+
+      return '<p class="muted">'+r.date+' · '+(r.mode==='A'?'지판→음':r.mode==='B'?'음→지판':'전체 찾기')+' · 0~'+r.range+'프렛 · '+
              r.correct+'/'+r.total+' ('+Math.round(r.correct/r.total*100)+'%)'+
              (r.avg!=null?' · 평균 '+r.avg+'초':'')+'</p>';
     }).join('');
